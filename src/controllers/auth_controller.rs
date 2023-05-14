@@ -39,6 +39,39 @@ pub fn handle_response(message: String, status: StatusCode) -> Response<String>{
         .unwrap()
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserResponse{
+    id: Option<ObjectId>,
+    email: String,
+}
+
+pub async fn get_user(ctx: Result<UserContext, StatusCode>, user_col: State<UserCollection>) -> Result<Json<UserResponse>, StatusCode>{
+    match ctx {
+        Ok(context) => {
+            let filter = doc! {"_id": context.user_id};
+            let user = user_col.user_collection.find_one(filter, None).await.unwrap_or(Option::None);
+
+            match user {
+                Some(user) => {
+
+                    let user_response = UserResponse{
+                        id: user.id,
+                        email: user.email,
+                    };
+
+                    Ok(Json(user_response))
+                },
+                None => {
+                    Err(StatusCode::NOT_FOUND)
+                }
+            }
+        },
+        Err(err) => {
+            Err(err)
+        }
+    }
+}
+
 
 pub async fn sign_up(user_col: State<UserCollection>, user: Json<User>) -> Response<String>{
 
@@ -107,13 +140,13 @@ pub async fn sing_in(cookies: Cookies, user_col: State<UserCollection>, user: Js
 
                 let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(jwt_token.as_ref())).unwrap();
 
-
+                // secure true in production
                 let cookie = Cookie::build("accessToken", token)
                     .path("/")
                     .max_age(time::Duration::days(1))
                     .http_only(true)
                     .same_site(SameSite::None)
-                    .secure(false)
+                    .secure(true)
                     .finish();
 
                 cookies.add(cookie);
@@ -147,7 +180,7 @@ pub async fn logout(cookies: Cookies) -> Response<String>{
         .path("/")
         .http_only(true)
         .same_site(SameSite::None)
-        .secure(false)
+        .secure(true)
         .finish();
 
 

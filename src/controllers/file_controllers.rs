@@ -52,6 +52,22 @@ pub async fn upload_file(ctx: Result<UserContext, StatusCode>, file_col: State<F
 
             file.user_id = Some(user_context.user_id);
 
+            file.original_file_name = Some(file.file_name.to_string());
+
+            let filter = doc! {"original_file_name": &file.file_name};
+
+            let mut count_duplicates = file_col.get_files(filter).await.unwrap_or(vec![]);
+
+            if count_duplicates.len() > 0 {
+                let mut split_file_name = file.file_name.split(".").collect::<Vec<_>>();
+                let file_name = split_file_name[0];
+                let file_duplicate = count_duplicates.len();
+                let file_format = split_file_name.pop().unwrap();
+
+                file.file_name = format!("{} ({}).{}", file_name, file_duplicate, file_format)
+            }
+            // Ok(Json(count_duplicates))
+
             let new_file = file_col.create_file(file).await;
 
             match new_file {
