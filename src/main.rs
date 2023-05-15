@@ -54,9 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let auth_router = Router::new()
-        .route("/auth/singup", post(sign_up))
-        .route("/auth/signin", post(sing_in))
-        .route("/auth/logout", post(logout))
+        .route("/singup", post(sign_up))
+        .route("/signin", post(sing_in))
+        .route("/logout", post(logout))
         .with_state(user_collection.clone());
 
 
@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let app = Router::new()
-        .nest_service("/", auth_router)
+        .nest_service("/auth", auth_router)
         .nest("/api", files_router)
         .nest("/user", user_router)
         .layer(cors)
