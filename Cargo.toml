@@ -1,5 +1,5 @@
 [package]
-name = "cloud_storage_backend"
+name = "cloud-storage-backend-heroku"
 version = "0.1.0"
 edition = "2021"
 
