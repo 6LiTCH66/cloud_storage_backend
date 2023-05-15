@@ -60,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(user_collection.clone());
 
 
+
     let files_collection = FileCollection::init().await?;
 
     let files_router = Router::new()
