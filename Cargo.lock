@@ -516,7 +516,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cloud-storage-backend-heroku"
+name = "cloud_storage_backend"
 version = "0.1.0"
 dependencies = [
  "async-trait",
