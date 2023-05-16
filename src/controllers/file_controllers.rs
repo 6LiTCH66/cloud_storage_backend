@@ -18,12 +18,25 @@ use crate::controllers::auth_controller::handle_response;
 use serde::{Serializer, Deserializer};
 use serde_qs::from_str;
 
-pub async fn get_files(ctx: Result<UserContext, StatusCode>, file_col: State<FileCollection>) -> Result<Json<Vec<File>>, StatusCode>{
 
+#[derive(Deserialize, Debug)]
+pub struct MyQueryParams {
+    pub file_type: Option<String>,
+}
+
+pub async fn get_files(ctx: Result<UserContext, StatusCode>, file_col: State<FileCollection>, Query(query_params): Query<MyQueryParams>) -> Result<Json<Vec<File>>, StatusCode>{
     match ctx {
         Ok(user_context) => {
 
-            let filter = doc! {"user_id": user_context.user_id};
+            let mut filter = doc! {"user_id": user_context.user_id};
+
+            match query_params.file_type {
+                Some(file_type) => {
+                    filter = doc! {"user_id": user_context.user_id, "file_type": file_type}
+                },
+                None => ()
+            }
+
             let files = file_col.get_files(filter).await;
 
             match files {

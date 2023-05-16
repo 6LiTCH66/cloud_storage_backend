@@ -28,6 +28,8 @@ use crate::services::file_services::FileCollection;
 use crate::services::trait_service::StorageCollection;
 use axum::{http::HeaderValue};
 
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -54,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let auth_router = Router::new()
-        .route("/singup", post(sign_up))
+        .route("/signup", post(sign_up))
         .route("/signin", post(sing_in))
         .route("/logout", post(logout))
         .with_state(user_collection.clone());
@@ -76,7 +78,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/get-user", get(get_user))
         .route_layer(axum_middleware::from_fn(verify_token))
         .with_state(user_collection.clone());
-
 
 
     let app = Router::new()
