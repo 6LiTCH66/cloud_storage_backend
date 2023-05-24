@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::exact("http://localhost:3000".parse().unwrap()))
+        .allow_origin(AllowOrigin::exact("https://cloud-storage-frontend-murex.vercel.app".parse().unwrap()))
         .allow_headers(vec![
         header::ACCEPT,
         header::ACCEPT_LANGUAGE,
