@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(CookieManagerLayer::new());
 
 
-    let addr = "127.0.0.1:3000".parse().unwrap();
+    let addr = "0.0.0.0:3000".parse().unwrap();
     println!("App is running at {}", addr);
 
     Server::bind(&addr)
