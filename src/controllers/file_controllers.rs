@@ -67,7 +67,7 @@ pub async fn upload_file(ctx: Result<UserContext, StatusCode>, file_col: State<F
 
             file.original_file_name = Some(file.file_name.to_string());
 
-            let filter = doc! {"original_file_name": &file.file_name};
+            let filter = doc! {"original_file_name": &file.file_name, "user_id": user_context.user_id};
 
             let mut count_duplicates = file_col.get_files(filter).await.unwrap_or(vec![]);
 

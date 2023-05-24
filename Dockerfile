@@ -1,26 +1,14 @@
-# Use the official Rust image as the base image
-FROM rust:latest as builder
+# Start from the latest Rust image
+FROM rust:latest
 
-# Set the working directory inside the container
-WORKDIR /app
+# Set the current working directory inside the docker image
+WORKDIR /usr/src/app
 
-# Copy the project files into the container
+# Copy your source code into the image
 COPY . .
 
-# Build the Rust application
+# Build your application for release
 RUN cargo build --release
 
-# Create a new image without the build tools
-FROM debian:buster-slim
-
-# Set the working directory inside the container
-WORKDIR /app
-
-# Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/cloud_storage_backend .
-
-# Expose any necessary ports
-EXPOSE 8000
-
-# Set the entry point command for the container
-CMD ["./cloud_storage_backend"]
+# Run the binary
+CMD ["/usr/src/app/target/release/cloud_storage_backend"]

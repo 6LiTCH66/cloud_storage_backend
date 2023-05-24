@@ -28,6 +28,9 @@ use crate::services::file_services::FileCollection;
 use crate::services::trait_service::StorageCollection;
 use axum::{http::HeaderValue};
 
+async fn root() -> &'static str {
+    "Hello, World!"
+}
 
 
 #[tokio::main]
@@ -81,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let app = Router::new()
+        .route("/", get(root))
         .nest_service("/auth", auth_router)
         .nest("/api", files_router)
         .nest("/user", user_router)
