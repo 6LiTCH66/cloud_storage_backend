@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -17,6 +18,7 @@ use serde::{Serialize, Deserialize};
 use crate::controllers::auth_controller::handle_response;
 use serde::{Serializer, Deserializer};
 use serde_qs::from_str;
+use crate::AppState;
 
 
 #[derive(Deserialize, Debug)]
@@ -24,7 +26,7 @@ pub struct MyQueryParams {
     pub file_type: Option<String>,
 }
 
-pub async fn get_files(ctx: Result<UserContext, StatusCode>, file_col: State<FileCollection>, Query(query_params): Query<MyQueryParams>) -> Result<Json<Vec<File>>, StatusCode>{
+pub async fn get_files(ctx: Result<UserContext, StatusCode>, state: State<Arc<AppState>>, Query(query_params): Query<MyQueryParams>) -> Result<Json<Vec<File>>, StatusCode>{
     match ctx {
         Ok(user_context) => {
 
@@ -37,7 +39,7 @@ pub async fn get_files(ctx: Result<UserContext, StatusCode>, file_col: State<Fil
                 None => ()
             }
 
-            let files = file_col.get_files(filter).await;
+            let files = state.file_collection.get_files(filter).await;
 
             match files {
                 Ok(files) => {
@@ -58,55 +60,19 @@ pub async fn get_files(ctx: Result<UserContext, StatusCode>, file_col: State<Fil
 
 }
 
-pub async fn upload_file(ctx: Result<UserContext, StatusCode>, file_col: State<FileCollection>, mut file: Json<File>) -> Result<Json<Vec<File>>, StatusCode>{
+pub async fn upload_file(ctx: UserContext, state: State<Arc<AppState>>, mut file: Json<File>) -> Result<Json<Vec<File>>, StatusCode>{
 
-    match ctx {
-        Ok(user_context) => {
+    let new_file = state.file_collection.create_file(file, ctx.user_id).await;
 
-            file.user_id = Some(user_context.user_id);
+    return match new_file {
+        Ok(_) => {
+            let filter = doc! {"user_id": ctx.user_id};
+            let mut files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
 
-            file.original_file_name = Some(file.file_name.to_string());
-
-            let filter = doc! {"original_file_name": &file.file_name, "user_id": user_context.user_id};
-
-            let mut count_duplicates = file_col.get_files(filter).await.unwrap_or(vec![]);
-
-            if count_duplicates.len() > 0 {
-                let mut split_file_name = file.file_name.split(".").collect::<Vec<_>>();
-                let file_name = split_file_name[0];
-                let file_duplicate = count_duplicates.len();
-                let file_format = split_file_name.pop().unwrap();
-
-                file.file_name = format!("{} ({}).{}", file_name, file_duplicate, file_format)
-            }
-            // Ok(Json(count_duplicates))
-
-            let new_file = file_col.create_file(file).await;
-
-            match new_file {
-
-                Ok(_) => {
-                    let filter = doc! {"user_id": user_context.user_id};
-                    let mut files = file_col.get_files(filter).await;
-
-                    match files {
-                        Ok(files) => {
-                            return Ok(Json(files));
-                        },
-                        Err(_) => {
-                            return Err(StatusCode::BAD_REQUEST);
-                        }
-                    }
-                },
-                Err(_) => {
-                    return Err(StatusCode::BAD_REQUEST);
-                }
-            }
-
-
+            Ok(Json(files))
         },
-        Err(err) => {
-            return Err(err);
+        Err(_) => {
+            Err(StatusCode::BAD_REQUEST)
         }
     }
 }
@@ -116,18 +82,17 @@ pub struct DeleteParams{
     ids: ObjectId
 }
 
-pub async fn delete_file(ctx: Result<UserContext, StatusCode>, file_col: State<FileCollection>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<File>>, StatusCode>{
+pub async fn delete_file(ctx: Result<UserContext, StatusCode>, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<File>>, StatusCode>{
 
     match ctx {
         Ok(user_context) => {
             let ids = params.0.to_vec().iter().map(|obj| doc! {"_id": obj.1, "user_id": user_context.user_id}).collect::<Vec<_>>();
 
-            let delete = file_col.file_collection.delete_many(doc! {"$or": ids, "user_id": user_context.user_id}, None).await;
-
+            let delete = state.file_collection.file_collection.delete_many(doc! {"$or": ids, "user_id": user_context.user_id}, None).await;
             match delete {
                 Ok(_) => {
                     let filter = doc! {"user_id": user_context.user_id};
-                    let files = file_col.get_files(filter).await.unwrap_or(vec![]);
+                    let files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
                     return Ok(Json(files));
                 }
                 Err(_) => {

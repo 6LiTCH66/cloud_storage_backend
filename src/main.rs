@@ -9,13 +9,14 @@ mod middleware;
 
 use std::env;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use axum::{Router, Server};
 use axum::body::HttpBody;
 use axum::http::{header, Method};
 use axum::routing::{delete, get, post};
 use mongodb::{Client, Collection, options::ClientOptions};
 use dotenv::dotenv;
-use crate::controllers::auth_controller::{get_user, logout, sign_up, sing_in, test_middleware};
+use crate::controllers::auth_controller::{get_user, logout, sign_up, sing_in};
 use crate::models::user_model::{User};
 use crate::services::auth_services::UserCollection;
 use tower_http::cors;
@@ -27,18 +28,28 @@ use crate::middleware::auth_middleware::verify_token;
 use crate::services::file_services::FileCollection;
 use crate::services::trait_service::StorageCollection;
 use axum::{http::HeaderValue};
+use axum::handler::Handler;
+use axum::middleware::AddExtension;
+use crate::controllers::folder_controllers::{create_folder, get_folders};
+use crate::services::folder_service::FolderCollection;
 
 async fn root() -> &'static str {
     "Hello, World!"
 }
 
+#[derive(Clone)]
+pub struct AppState {
+    pub file_collection: FileCollection,
+    pub folder_collection: FolderCollection,
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
+    // https://cloud-storage-frontend-murex.vercel.app
 
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::exact("https://cloud-storage-frontend-murex.vercel.app".parse().unwrap()))
+        .allow_origin(AllowOrigin::exact("http://localhost:3000".parse().unwrap()))
         .allow_headers(vec![
         header::ACCEPT,
         header::ACCEPT_LANGUAGE,
@@ -65,8 +76,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(user_collection.clone());
 
 
-
+    let folder_collection = FolderCollection::init().await?;
     let files_collection = FileCollection::init().await?;
+
+    let state = Arc::new(AppState {
+        file_collection: files_collection.clone(),
+        folder_collection: folder_collection.clone(),
+    });
+
+
 
     let files_router = Router::new()
         .route("/files", get(get_files))
@@ -74,7 +92,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/delete", delete(delete_file))
 
         .route_layer(axum_middleware::from_fn(verify_token))
-        .with_state(files_collection);
+        .with_state(state.clone());
+
+
+
+
+
+
+    let folder_router = Router::new()
+        .route("/create", post(create_folder))
+        .route("/folders", get(get_folders))
+        .route_layer(axum_middleware::from_fn(verify_token))
+
+        .with_state(state);
 
 
     let user_router = Router::new()
@@ -88,11 +118,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest_service("/auth", auth_router)
         .nest("/api", files_router)
         .nest("/user", user_router)
+        .nest("/folder", folder_router)
         .layer(cors)
         .layer(CookieManagerLayer::new());
 
 
-    let addr = "0.0.0.0:3000".parse().unwrap();
+    // let addr = "0.0.0.0:3000".parse().unwrap();
+    let addr = "127.0.0.1:8080".parse().unwrap();
     println!("App is running at {}", addr);
 
     Server::bind(&addr)

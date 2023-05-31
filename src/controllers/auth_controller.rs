@@ -146,7 +146,7 @@ pub async fn sing_in(cookies: Cookies, user_col: State<UserCollection>, user: Js
                     .max_age(time::Duration::days(1))
                     .http_only(true)
                     .same_site(SameSite::None)
-                    .secure(true)
+                    .secure(false)
                     .finish();
 
                 cookies.add(cookie);
@@ -205,11 +205,4 @@ impl<S: Send + Sync> FromRequestParts<S> for UserContext{
             .ok_or(StatusCode::BAD_REQUEST)
             .cloned()
     }
-}
-
-
-pub async fn test_middleware(ctx: Result<UserContext, StatusCode>, cookies: Cookies, user: Json<User>) -> Result<Json<User>, ()>{
-    // println!("{:?}", cookies);
-    println!("{:?}", ctx);
-    Ok(user)
 }
