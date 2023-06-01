@@ -1,5 +1,6 @@
+use std::fs::FileType;
 use std::sync::Arc;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
 use bson::doc;
@@ -90,4 +91,61 @@ pub async fn get_folders(ctx: UserContext, state: State<Arc<AppState>>) -> Resul
 
     let folder_to_display = state.folder_collection.get_folder(filter).await.unwrap_or(vec![]);
     Ok(Json(folder_to_display))
+}
+
+
+fn delete_folder_from_db<'a>(state: &'a State<Arc<AppState>>, folders: &'a [Folder], user_id: &'a ObjectId) -> BoxFuture<'a, mongodb::error::Result<()>>{
+
+    async move{
+
+        for folder in folders {
+
+            if let Some(subfolders) = &folder.folders{
+                delete_folder_from_db(&state, subfolders, &user_id).await;
+            }
+
+            if let Some(files) = &folder.files{
+                for file in files {
+                    let file_filter = doc! {"_id": file.id};
+                    state.file_collection.delete_one_file(file_filter).await;
+                }
+            }
+            let update_filter = doc! {"_id": folder.parent_id};
+
+            let update = doc! {
+                    "$pull": {
+                        "folders": {
+                            "_id": folder.id,
+                        },
+                    },
+                };
+
+            let filter = doc! {"_id": folder.id};
+            state.folder_collection.update_folder(update_filter, update).await;
+            state.folder_collection.delete_one_folder(filter).await;
+
+
+        }
+
+        Ok(())
+    }.boxed()
+}
+
+
+pub async fn delete_folder(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<Folder>>, StatusCode>{
+
+    let folders = state.folder_collection.get_folder_by_id(&params, &ctx.user_id).await; // getting single folder with nested folders
+
+    let is_folders_deleted = delete_folder_from_db(&state, &folders.clone().unwrap(), &ctx.user_id).await;
+
+    match is_folders_deleted {
+        Ok(_) => {
+            let filter = doc! {"user_id": ctx.user_id, "folder_type": FolderType::Folder};
+            let folders = state.folder_collection.get_folder(filter).await.unwrap_or(vec![]);
+            return Ok(Json(folders));
+        }
+        Err(_) => {
+            Err(StatusCode::BAD_REQUEST)
+        }
+    }
 }

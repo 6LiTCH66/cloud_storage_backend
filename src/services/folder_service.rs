@@ -3,8 +3,9 @@ use crate::models::folder_model::Folder;
 use crate::services::trait_service::StorageCollection;
 use async_trait::async_trait;
 use std::env;
+use axum::extract::Query;
 use axum::Json;
-use bson::Document;
+use bson::{doc, Document};
 use bson::oid::ObjectId;
 use chrono::Utc;
 use dotenv::dotenv;
@@ -12,7 +13,7 @@ use futures::TryStreamExt;
 use mongodb::options::{ClientOptions};
 
 use mongodb::{Client};
-use mongodb::results::InsertOneResult;
+use mongodb::results::{DeleteResult, InsertOneResult, UpdateResult};
 use crate::services::file_services::FileCollection;
 
 #[derive(Debug, Clone)]
@@ -33,6 +34,28 @@ impl FolderCollection {
         new_folder.user_id = Some(user_id.clone());
         self.folder_collection.insert_one(&**new_folder, None).await
     }
+
+    pub async fn get_folder_by_id(&self, params: &Query<Vec<(String, ObjectId)>>, user_id: &ObjectId) -> Result<Vec<Folder>, mongodb::error::Error>{
+        let ids = params.0.to_vec().iter().map(|obj| doc! {"_id": obj.1, "user_id": user_id}).collect::<Vec<_>>();
+
+        self.folder_collection.find(doc! {"$or": ids, "user_id": user_id}, None).await?.try_collect::<Vec<Folder>>().await
+    }
+
+
+    pub async fn delete_folders(&self, params: &Query<Vec<(String, ObjectId)>>, user_id: &ObjectId) -> Result<DeleteResult, mongodb::error::Error>{
+        let ids = params.0.to_vec().iter().map(|obj| doc! {"_id": obj.1, "user_id": user_id}).collect::<Vec<_>>();
+
+        self.folder_collection.delete_many(doc! {"$or": ids, "user_id": user_id}, None).await
+    }
+
+    pub async fn delete_one_folder(&self, filter: Document) -> Result<DeleteResult, mongodb::error::Error>{
+        self.folder_collection.delete_many(filter, None).await
+    }
+
+    pub async fn update_folder(&self, filter: Document, update: Document) -> Result<UpdateResult, mongodb::error::Error>{
+        self.folder_collection.update_one(filter, update, None).await
+    }
+
 }
 
 

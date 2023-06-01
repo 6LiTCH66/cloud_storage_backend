@@ -30,7 +30,7 @@ use crate::services::trait_service::StorageCollection;
 use axum::{http::HeaderValue};
 use axum::handler::Handler;
 use axum::middleware::AddExtension;
-use crate::controllers::folder_controllers::{create_folder, get_folders};
+use crate::controllers::folder_controllers::{create_folder, delete_folder, get_folders};
 use crate::services::folder_service::FolderCollection;
 
 async fn root() -> &'static str {
@@ -102,6 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let folder_router = Router::new()
         .route("/create", post(create_folder))
         .route("/folders", get(get_folders))
+        .route("/delete", delete(delete_folder))
         .route_layer(axum_middleware::from_fn(verify_token))
 
         .with_state(state);

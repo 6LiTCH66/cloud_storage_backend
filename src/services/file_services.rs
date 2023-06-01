@@ -2,6 +2,7 @@ use std::env;
 use mongodb::{Client, Collection, Cursor};
 use crate::models::file_model::File;
 use async_trait::async_trait;
+use axum::extract::Query;
 use axum::Json;
 use bson::oid::ObjectId;
 use chrono::Utc;
@@ -12,7 +13,7 @@ use mongodb::options::{ClientOptions, FindOptions};
 use crate::services::auth_services::UserCollection;
 use crate::services::trait_service::StorageCollection;
 use mongodb::error::{Error, Result as MongoResult};
-use mongodb::results::InsertOneResult;
+use mongodb::results::{DeleteResult, InsertOneResult};
 
 #[derive(Debug, Clone)]
 pub struct FileCollection{
@@ -27,7 +28,6 @@ impl FileCollection {
         files
 
     }
-
 
 
     pub async fn create_file(&self, mut new_file: Json<File>, user_id: ObjectId) -> Result<InsertOneResult, Error>{
@@ -54,6 +54,16 @@ impl FileCollection {
 
 
         return self.file_collection.insert_one(&*new_file, None).await;
+    }
+
+    pub async fn delete_files(&self, params: &Query<Vec<(String, ObjectId)>>, user_id: &ObjectId) -> Result<DeleteResult, Error>{
+        let ids = params.0.to_vec().iter().map(|obj| doc! {"_id": obj.1, "user_id": user_id}).collect::<Vec<_>>();
+
+        self.file_collection.delete_many(doc! {"$or": ids, "user_id": user_id}, None).await
+    }
+
+    pub async fn delete_one_file(&self, filter: Document) ->  Result<DeleteResult, Error>{
+        self.file_collection.delete_one(filter, None).await
     }
 
 

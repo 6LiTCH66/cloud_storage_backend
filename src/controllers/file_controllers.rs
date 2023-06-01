@@ -82,28 +82,23 @@ pub struct DeleteParams{
     ids: ObjectId
 }
 
-pub async fn delete_file(ctx: Result<UserContext, StatusCode>, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<File>>, StatusCode>{
+pub async fn delete_file(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<File>>, StatusCode>{
 
-    match ctx {
-        Ok(user_context) => {
-            let ids = params.0.to_vec().iter().map(|obj| doc! {"_id": obj.1, "user_id": user_context.user_id}).collect::<Vec<_>>();
 
-            let delete = state.file_collection.file_collection.delete_many(doc! {"$or": ids, "user_id": user_context.user_id}, None).await;
-            match delete {
-                Ok(_) => {
-                    let filter = doc! {"user_id": user_context.user_id};
-                    let files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
-                    return Ok(Json(files));
-                }
-                Err(_) => {
-                    Err(StatusCode::BAD_REQUEST)
-                }
+
+        let delete = state.file_collection.delete_files(&params, &ctx.user_id).await;
+
+        match delete {
+            Ok(_) => {
+                let filter = doc! {"user_id": ctx.user_id};
+                let files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
+                return Ok(Json(files));
             }
-        },
-        Err(err) => {
-            Err(err)
+            Err(_) => {
+                Err(StatusCode::BAD_REQUEST)
+            }
         }
-    }
+
 
 }
 
