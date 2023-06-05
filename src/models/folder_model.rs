@@ -29,12 +29,13 @@ pub struct Folder{
 
     pub folder_type: Option<FolderType>,
 
-    pub files: Option<Vec<File>>,
+    pub files: Option<Vec<ObjectId>>,
 
-    pub folders: Option<Vec<Folder>>,
+    pub folders: Option<Vec<ObjectId>>,
 
     #[serde(rename = "createdAt")]
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 
@@ -42,3 +43,42 @@ pub struct Folder{
 
     pub user_id: Option<ObjectId>
 }
+
+
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FolderJSON{
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
+
+    pub folder_name: String,
+
+    pub folder_type: Option<FolderType>,
+
+    pub files: Option<Vec<File>>,
+
+    pub folders: Option<Vec<FolderJSON>>,
+
+    pub parent_id: Option<ObjectId>,
+
+
+}
+
+impl Folder {
+    pub fn new() -> Self {
+        Self {
+            id: None,
+            folder_name: "".to_string(),
+            folder_type: None,
+            files: None,
+            folders: None,
+            created_at: None,
+            updated_at: None,
+            parent_id: None,
+            user_id: None,
+        }
+    }
+
+}
+

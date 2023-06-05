@@ -19,6 +19,10 @@ pub struct File{
     pub aws_file_name: String,
     pub file_location: String,
     pub size: u64,
+
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub user_id: Option<ObjectId>
+
+    pub user_id: Option<ObjectId>,
+
+    pub folder_id: Option<ObjectId>,
 }

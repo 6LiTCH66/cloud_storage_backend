@@ -9,21 +9,22 @@ use chrono::Utc;
 use crate::AppState;
 use crate::context::user_context::UserContext;
 use crate::models::file_model::File;
-use crate::models::folder_model::{Folder, FolderType};
+use crate::models::folder_model::{Folder, FolderJSON, FolderType};
 use crate::services::file_services::FileCollection;
 use crate::services::folder_service::FolderCollection;
 use futures::future::BoxFuture;
 use futures::{FutureExt};
 
-async fn save_files_to_db(state: &State<Arc<AppState>>, files: &mut [File], user_id: &ObjectId) -> mongodb::error::Result<Vec<File>>{
-    let mut files_array: Vec<File> = vec![];
+
+
+async fn save_files_to_db(state: &State<Arc<AppState>>, files: &mut [File], user_id: &ObjectId, folder_id: Option<ObjectId>) -> mongodb::error::Result<Vec<ObjectId>>{
+    let mut files_array: Vec<ObjectId> = vec![];
 
     for file in files{
+        file.folder_id = folder_id;
         let inserted_file = state.file_collection.create_file(Json(file.clone()), user_id.clone()).await.unwrap();
 
-        let filter = doc! { "_id": inserted_file.inserted_id };
-        let result = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
-        files_array.extend(result);
+        files_array.push(inserted_file.inserted_id.as_object_id().unwrap());
 
     }
 
@@ -32,53 +33,63 @@ async fn save_files_to_db(state: &State<Arc<AppState>>, files: &mut [File], user
 
 
 
-fn save_folders_to_db<'a>(state: &'a State<Arc<AppState>>, mut folder: &'a mut Folder, user_id: &'a ObjectId) -> BoxFuture<'a, mongodb::error::Result<()>> {
+fn save_folders_to_db<'a>(state: &'a State<Arc<AppState>>, mut folder: &'a mut FolderJSON, user_id: &'a ObjectId) -> BoxFuture<'a, mongodb::error::Result<()>> {
     async move{
 
+        let mut new_folder = Folder::new();
+
         let folder_id = Some(ObjectId::new());
+
         folder.id = folder_id;
 
+        new_folder.id = folder_id.clone();
+
+        new_folder.folder_name = folder.folder_name.clone();
+        new_folder.folder_type = folder.folder_type.clone();
+        new_folder.user_id = Some(user_id.clone());
+        new_folder.parent_id = folder.parent_id;
+
         if let Some(files) = &mut folder.files{
-            let mut files_array = save_files_to_db(&state, files, &user_id).await.unwrap_or(vec![]);
 
+            let mut files_array = save_files_to_db(&state, files, &user_id, folder_id).await.unwrap_or(vec![]);
 
-            folder.files = None;
-            folder.files = Some(files_array);
+            new_folder.files = Some(files_array);
+
         }
 
         if let Some(subfolders) = &mut folder.folders{
-            let now = Utc::now();
+
+            let mut folders_array: Vec<ObjectId> = vec![];
+
             for subfolder in subfolders {
 
                 subfolder.parent_id = folder.id.clone();
-
                 subfolder.folder_type = Some(FolderType::Subfolder);
-                subfolder.created_at = Some(now);
-                subfolder.updated_at = Some(now);
-                subfolder.user_id = Some(user_id.clone());
 
 
                 save_folders_to_db(&state, subfolder, &user_id).await.unwrap();
-
-                state.folder_collection.create_folder(&mut Json(subfolder.clone()), &user_id).await.unwrap();
+                folders_array.push(subfolder.id.unwrap());
+                new_folder.folders = Some(folders_array.clone());
 
             }
+
         }
+        state.folder_collection.create_folder(&mut Json(new_folder.clone()), &user_id).await.unwrap();
+
+
 
         Ok(())
     }.boxed()
 
 }
 
-pub async fn create_folder(ctx: UserContext, state: State<Arc<AppState>>, mut folder: Json<Folder>) -> Result<Json<Vec<Folder>>, StatusCode>{
-
+pub async fn create_folder(ctx: UserContext, state: State<Arc<AppState>>, mut folder: Json<FolderJSON>) -> Result<Json<Vec<Folder>>, StatusCode>{
 
     folder.folder_type = Some(FolderType::Folder);
     save_folders_to_db(&state, &mut folder, &ctx.user_id).await;
 
     let filter = doc! {"user_id": ctx.user_id, "folder_type": FolderType::Folder};
 
-    state.folder_collection.create_folder(&mut folder, &ctx.user_id).await.unwrap();
     let folder_to_display = state.folder_collection.get_folder(filter).await.unwrap_or(vec![]);
 
     Ok(Json(folder_to_display))
@@ -101,26 +112,31 @@ fn delete_folder_from_db<'a>(state: &'a State<Arc<AppState>>, folders: &'a [Fold
         for folder in folders {
 
             if let Some(subfolders) = &folder.folders{
-                delete_folder_from_db(&state, subfolders, &user_id).await;
+                for subfolder in subfolders {
+                    let filter = doc! {"_id": subfolder, "user_id": user_id};
+
+                    let mut folders = state.folder_collection.get_folder(filter).await.unwrap();
+
+                    delete_folder_from_db(&state, &folders, &user_id).await;
+                }
             }
 
             if let Some(files) = &folder.files{
                 for file in files {
-                    let file_filter = doc! {"_id": file.id};
+                    let file_filter = doc! {"_id": file, "user_id": user_id};
                     state.file_collection.delete_one_file(file_filter).await;
                 }
             }
-            let update_filter = doc! {"_id": folder.parent_id};
+
+            let update_filter = doc! {"_id": folder.parent_id, "user_id": user_id};
 
             let update = doc! {
                     "$pull": {
-                        "folders": {
-                            "_id": folder.id,
-                        },
+                        "folders": folder.id
                     },
                 };
 
-            let filter = doc! {"_id": folder.id};
+            let filter = doc! {"_id": folder.id, "user_id": user_id};
             state.folder_collection.update_folder(update_filter, update).await;
             state.folder_collection.delete_one_folder(filter).await;
 
@@ -135,6 +151,7 @@ fn delete_folder_from_db<'a>(state: &'a State<Arc<AppState>>, folders: &'a [Fold
 pub async fn delete_folder(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<Folder>>, StatusCode>{
 
     let folders = state.folder_collection.get_folder_by_id(&params, &ctx.user_id).await; // getting single folder with nested folders
+
 
     let is_folders_deleted = delete_folder_from_db(&state, &folders.clone().unwrap(), &ctx.user_id).await;
 
