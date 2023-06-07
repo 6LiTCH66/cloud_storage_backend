@@ -13,7 +13,7 @@ use mongodb::options::{ClientOptions, FindOptions};
 use crate::services::auth_services::UserCollection;
 use crate::services::trait_service::StorageCollection;
 use mongodb::error::{Error, Result as MongoResult};
-use mongodb::results::{DeleteResult, InsertOneResult};
+use mongodb::results::{DeleteResult, InsertOneResult, UpdateResult};
 
 #[derive(Debug, Clone)]
 pub struct FileCollection{
@@ -57,13 +57,17 @@ impl FileCollection {
     }
 
     pub async fn delete_files(&self, params: &Query<Vec<(String, ObjectId)>>, user_id: &ObjectId) -> Result<DeleteResult, Error>{
-        let ids = params.0.to_vec().iter().map(|obj| doc! {"_id": obj.1, "user_id": user_id}).collect::<Vec<_>>();
+        let ids = params.0.to_vec().iter().filter(|obj| obj.0 == "ids").map(|obj| doc! {"_id": obj.1, "user_id": user_id}).collect::<Vec<_>>();
 
         self.file_collection.delete_many(doc! {"$or": ids, "user_id": user_id}, None).await
     }
 
     pub async fn delete_one_file(&self, filter: Document) ->  Result<DeleteResult, Error>{
         self.file_collection.delete_one(filter, None).await
+    }
+
+    pub async fn update_folder(&self, filter: Document, update: Document) ->  Result<UpdateResult, Error>{
+        self.file_collection.update_one(filter, update, None).await
     }
 
 

@@ -30,7 +30,7 @@ pub async fn get_files(ctx: Result<UserContext, StatusCode>, state: State<Arc<Ap
     match ctx {
         Ok(user_context) => {
 
-            let mut filter = doc! {"user_id": user_context.user_id};
+            let mut filter = doc! {"user_id": user_context.user_id, "folder_id": None::<ObjectId>};
 
             match query_params.file_type {
                 Some(file_type) => {
@@ -60,13 +60,44 @@ pub async fn get_files(ctx: Result<UserContext, StatusCode>, state: State<Arc<Ap
 
 }
 
-pub async fn upload_file(ctx: UserContext, state: State<Arc<AppState>>, mut file: Json<File>) -> Result<Json<Vec<File>>, StatusCode>{
+pub async fn upload_file(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>, mut file: Json<File>) -> Result<Json<Vec<File>>, StatusCode>{
 
     let new_file = state.file_collection.create_file(file, ctx.user_id).await;
 
+
     return match new_file {
-        Ok(_) => {
-            let filter = doc! {"user_id": ctx.user_id};
+        Ok(file) => {
+            let folder_id = params.0.to_vec().iter().filter(|obj| obj.0 == "folder_id").map(|obj| obj.1).collect::<Vec<_>>();
+
+
+            if !folder_id.is_empty() {
+                let update_file_filter = doc! {"_id": file.inserted_id.as_object_id()};
+
+                let update_file = doc! {
+                    "$set":{
+                        "folder_id": folder_id.get(0).unwrap()
+                        }
+                };
+
+                state.file_collection.update_folder(update_file_filter, update_file).await;
+
+
+                let update_folder_filter = doc! {
+                    "_id": folder_id.get(0).unwrap(),
+                };
+
+                let update_folder = doc! {
+                    "$push": {
+                        "files": file.inserted_id.as_object_id(),
+                    },
+                };
+
+                state.folder_collection.update_folder(update_folder_filter, update_folder).await;
+            }
+
+
+
+            let filter = doc! {"user_id": ctx.user_id, "folder_id": None::<ObjectId>};
             let mut files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
 
             Ok(Json(files))
@@ -85,19 +116,33 @@ pub struct DeleteParams{
 pub async fn delete_file(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<File>>, StatusCode>{
 
 
+    let file_ids = params.0.to_vec().iter().filter(|obj| obj.0 == "ids").map(|obj| obj.1).collect::<Vec<_>>();
+    let folder_id = params.0.to_vec().iter().filter(|obj| obj.0 == "folder_id").map(|obj| obj.1).collect::<Vec<_>>();
 
-        let delete = state.file_collection.delete_files(&params, &ctx.user_id).await;
+    let update_filter = doc! {"_id": folder_id.get(0), "user_id": ctx.user_id};
 
-        match delete {
-            Ok(_) => {
-                let filter = doc! {"user_id": ctx.user_id};
-                let files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
-                return Ok(Json(files));
+    let update = doc! {
+        "$pull": {
+            "files": {
+                "$in": file_ids
             }
-            Err(_) => {
-                Err(StatusCode::BAD_REQUEST)
-            }
+        },
+    };
+
+    state.folder_collection.update_folder(update_filter, update).await;
+    let delete = state.file_collection.delete_files(&params, &ctx.user_id).await;
+
+
+    match delete {
+        Ok(_) => {
+            let filter = doc! {"user_id": ctx.user_id};
+            let files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
+            return Ok(Json(files));
         }
+        Err(_) => {
+            Err(StatusCode::BAD_REQUEST)
+        }
+    }
 
 
 }
