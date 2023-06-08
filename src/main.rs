@@ -8,6 +8,7 @@ mod context;
 mod middleware;
 
 use std::env;
+use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use axum::{Router, Server};
@@ -30,7 +31,12 @@ use crate::services::trait_service::StorageCollection;
 use axum::{http::HeaderValue};
 use axum::handler::Handler;
 use axum::middleware::AddExtension;
+use chrono::{DateTime, Utc};
+use serde::Serialize;
+use crate::controllers::dashboard_controllers::get_dashboard;
 use crate::controllers::folder_controllers::{create_folder, delete_folder, get_folders};
+use crate::models::file_model::File;
+use crate::models::folder_model::Folder;
 use crate::services::folder_service::FolderCollection;
 
 async fn root() -> &'static str {
@@ -42,6 +48,14 @@ pub struct AppState {
     pub file_collection: FileCollection,
     pub folder_collection: FolderCollection,
 }
+
+#[derive(Serialize, Clone, Debug)]
+
+enum Item {
+    File(File),
+    Folder(Folder),
+}
+
 
 
 #[tokio::main]
@@ -95,7 +109,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(state.clone());
 
 
-
+    let dashboard_router = Router::new()
+        .route("/", get(get_dashboard))
+        .route_layer(axum_middleware::from_fn(verify_token))
+        .with_state(state.clone());
 
 
 
@@ -120,6 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api", files_router)
         .nest("/user", user_router)
         .nest("/folder", folder_router)
+        .nest("/dashboard", dashboard_router)
         .layer(cors)
         .layer(CookieManagerLayer::new());
 
