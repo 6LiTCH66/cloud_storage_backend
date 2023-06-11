@@ -51,9 +51,9 @@ pub struct AppState {
 
 #[derive(Serialize, Clone, Debug)]
 
-enum Item {
-    File(File),
-    Folder(Folder),
+enum Item<A, B> {
+    File(A),
+    Folder(B),
 }
 
 

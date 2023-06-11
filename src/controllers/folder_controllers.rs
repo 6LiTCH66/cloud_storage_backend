@@ -93,6 +93,7 @@ pub async fn create_folder(ctx: UserContext, state: State<Arc<AppState>>, params
 
     if folder_id.is_empty() {
         folder.folder_type = Some(FolderType::Folder);
+
         save_folders_to_db(&state, &mut folder, &ctx.user_id).await;
 
 

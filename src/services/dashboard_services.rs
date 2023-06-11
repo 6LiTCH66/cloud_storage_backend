@@ -10,7 +10,7 @@ use crate::models::file_model::File;
 use crate::models::folder_model::{Folder, FolderType};
 
 
-fn sort_items(items: &mut Vec<Item>) {
+fn sort_items(items: &mut Vec<Item<File, Folder>>) {
     items.sort_by(|a, b| match (a, b) {
         (Item::File(file1), Item::File(file2)) => file1.created_at.cmp(&file2.created_at),
         (Item::Folder(folder1), Item::Folder(folder2)) => folder1.created_at.cmp(&folder2.created_at),
@@ -20,7 +20,7 @@ fn sort_items(items: &mut Vec<Item>) {
 }
 
 impl AppState {
-    pub async fn get_dashboard_controller(&self, user_id: &ObjectId) -> Result<Vec<Item>, Box<dyn Error>>{
+    pub async fn get_dashboard_controller(&self, user_id: &ObjectId) -> Result<Vec<Item<File, Folder>>, Box<dyn Error>>{
 
         let file_filter = doc! {"user_id": user_id, "folder_id": None::<ObjectId>};
         let folder_filter = doc! {"user_id": user_id, "folder_type": FolderType::Folder};
@@ -35,7 +35,7 @@ impl AppState {
             Err(e) => return Err(e.into())
         };
 
-        let mut items: Vec<Item> = Vec::new();
+        let mut items: Vec<Item<File, Folder>> = Vec::new();
 
         for file in files.iter() {
             items.push(Item::File(file.clone()));
