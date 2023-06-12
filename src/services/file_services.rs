@@ -23,12 +23,17 @@ pub struct FileCollection{
 
 impl FileCollection {
 
-    pub async fn get_files(&self, filter: Document) -> Result<Vec<File>, Error> {
+    pub async fn get_file(&self, filter: Document) -> Result<Vec<File>, Error> {
         let files = self.file_collection.find(filter, None).await?.try_collect::<Vec<File>>().await;
         files
 
     }
 
+    pub async fn get_many_files(&self, params: &Query<Vec<(String, ObjectId)>>, user_id: &ObjectId) -> Result<Vec<File>, Error>{
+        let ids = params.0.to_vec().iter().filter(|obj| obj.0 == "ids").map(|obj| doc! {"_id": obj.1, "user_id": user_id}).collect::<Vec<_>>();
+        self.file_collection.find(doc! {"$or": ids, "user_id": user_id}, None).await?.try_collect::<Vec<File>>().await
+
+    }
 
     pub async fn create_file(&self, mut new_file: Json<File>, user_id: ObjectId) -> Result<InsertOneResult, Error>{
 
@@ -41,7 +46,7 @@ impl FileCollection {
 
         let filter = doc! {"original_file_name": &new_file.file_name, "user_id": user_id.clone()};
 
-        let mut count_duplicates = self.get_files(filter).await.unwrap_or(vec![]);
+        let mut count_duplicates = self.get_file(filter).await.unwrap_or(vec![]);
 
         if count_duplicates.len() > 0 {
             let mut split_file_name = new_file.file_name.split(".").collect::<Vec<_>>();

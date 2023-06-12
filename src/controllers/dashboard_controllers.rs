@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use bson::doc;
@@ -11,9 +11,10 @@ use axum::{response::IntoResponse};
 use crate::models::file_model::File;
 
 
-pub async fn get_dashboard(ctx: UserContext, state: State<Arc<AppState>>) -> Result<Json<Vec<Item<File, Folder>>>, StatusCode>{
+pub async fn get_dashboard(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Vec<Item<File, Folder>>>, StatusCode>{
 
-    let dashboard_result = state.get_dashboard_controller(&ctx.user_id).await;
+    let dashboard_result = state.get_dashboard_controller(&ctx.user_id, &params).await;
+
     return match dashboard_result {
         Ok(dashboard) => {
             Ok(Json(dashboard))

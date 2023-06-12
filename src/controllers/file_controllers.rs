@@ -39,7 +39,7 @@ pub async fn get_files(ctx: Result<UserContext, StatusCode>, state: State<Arc<Ap
                 None => ()
             }
 
-            let files = state.file_collection.get_files(filter).await;
+            let files = state.file_collection.get_file(filter).await;
 
             match files {
                 Ok(files) => {
@@ -98,7 +98,7 @@ pub async fn upload_file(ctx: UserContext, state: State<Arc<AppState>>, params: 
 
 
             let filter = doc! {"user_id": ctx.user_id, "folder_id": None::<ObjectId>};
-            let mut files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
+            let mut files = state.file_collection.get_file(filter).await.unwrap_or(vec![]);
 
             Ok(Json(files))
         },
@@ -136,7 +136,7 @@ pub async fn delete_file(ctx: UserContext, state: State<Arc<AppState>>, params: 
     match delete {
         Ok(_) => {
             let filter = doc! {"user_id": ctx.user_id};
-            let files = state.file_collection.get_files(filter).await.unwrap_or(vec![]);
+            let files = state.file_collection.get_file(filter).await.unwrap_or(vec![]);
             return Ok(Json(files));
         }
         Err(_) => {
