@@ -99,7 +99,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
 
-
     let files_router = Router::new()
         .route("/files", get(get_files))
         .route("/upload", post(upload_file))
@@ -142,8 +141,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(CookieManagerLayer::new());
 
 
-    // let addr = "0.0.0.0:3000".parse().unwrap();
-    let addr = "127.0.0.1:8080".parse().unwrap();
+    let addr = "0.0.0.0:3000".parse().unwrap();
+    // let addr = "127.0.0.1:8080".parse().unwrap();
     println!("App is running at {}", addr);
 
     Server::bind(&addr)
