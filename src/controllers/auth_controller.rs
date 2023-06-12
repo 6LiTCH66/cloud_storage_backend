@@ -146,7 +146,7 @@ pub async fn sing_in(cookies: Cookies, user_col: State<UserCollection>, user: Js
                     .max_age(time::Duration::days(1))
                     .http_only(true)
                     .same_site(SameSite::None)
-                    .secure(false)
+                    .secure(true)
                     .finish();
 
                 cookies.add(cookie);
