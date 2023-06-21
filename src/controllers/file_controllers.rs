@@ -30,7 +30,7 @@ pub async fn get_files(ctx: Result<UserContext, StatusCode>, state: State<Arc<Ap
     match ctx {
         Ok(user_context) => {
 
-            let mut filter = doc! {"user_id": user_context.user_id, "folder_id": None::<ObjectId>};
+            let mut filter = doc! {"user_id": user_context.user_id};
 
             match query_params.file_type {
                 Some(file_type) => {

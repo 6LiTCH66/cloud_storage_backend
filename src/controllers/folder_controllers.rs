@@ -62,6 +62,10 @@ fn save_folders_to_db<'a>(state: &'a State<Arc<AppState>>, mut folder: &'a mut F
 
         if let Some(subfolders) = &mut folder.folders{
 
+            if subfolders.is_empty() {
+                new_folder.folders = Some(Vec::new());
+            }
+
             let mut folders_array: Vec<ObjectId> = vec![];
 
             for subfolder in subfolders {
@@ -92,13 +96,17 @@ pub async fn create_folder(ctx: UserContext, state: State<Arc<AppState>>, params
     let folder_id = params.0.to_vec().iter().filter(|obj| obj.0 == "folder_id").map(|obj| obj.1).collect::<Vec<_>>();
 
     if folder_id.is_empty() {
+
         folder.folder_type = Some(FolderType::Folder);
 
         save_folders_to_db(&state, &mut folder, &ctx.user_id).await;
 
 
     }else{
+
         folder.folder_type = Some(FolderType::Subfolder);
+        folder.parent_id = Some(folder_id.get(0).unwrap().clone());
+
         let id = save_folders_to_db(&state, &mut folder, &ctx.user_id).await.unwrap();
 
         let update_filter = doc! {"_id": folder_id.get(0).unwrap(), "user_id": ctx.user_id};
@@ -108,6 +116,7 @@ pub async fn create_folder(ctx: UserContext, state: State<Arc<AppState>>, params
                         "folders": id
                     },
             };
+
         state.folder_collection.update_folder(update_filter, update).await;
 
     }
