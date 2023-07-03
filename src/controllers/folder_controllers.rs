@@ -12,7 +12,7 @@ use crate::models::file_model::File;
 use crate::models::folder_model::{Folder, FolderJSON, FolderType};
 use crate::services::file_services::FileCollection;
 use crate::services::folder_service::FolderCollection;
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, Join};
 use futures::{FutureExt};
 
 
@@ -48,6 +48,7 @@ fn save_folders_to_db<'a>(state: &'a State<Arc<AppState>>, mut folder: &'a mut F
         new_folder.folder_type = folder.folder_type.clone();
         new_folder.user_id = Some(user_id.clone());
         new_folder.parent_id = folder.parent_id;
+        new_folder.path = folder.path.clone();
 
         if let Some(files) = &mut folder.files{
 
@@ -135,6 +136,19 @@ pub async fn get_folders(ctx: UserContext, state: State<Arc<AppState>>) -> Resul
 
     let folder_to_display = state.folder_collection.get_folder(filter).await.unwrap_or(vec![]);
     Ok(Json(folder_to_display))
+}
+
+pub async fn get_folder_details(ctx: UserContext, state: State<Arc<AppState>>, params: Query<Vec<(String, ObjectId)>>) -> Result<Json<Folder>, StatusCode>{
+    let folder = state.folder_collection.get_folder_by_id(&params, &ctx.user_id).await;
+
+    match folder {
+        Ok(folder) => {
+            Ok(Json(folder.get(0).unwrap().clone()))
+        }
+        Err(_) => {
+            Err(StatusCode::BAD_REQUEST)
+        }
+    }
 }
 
 

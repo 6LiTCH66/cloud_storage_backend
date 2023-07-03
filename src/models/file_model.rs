@@ -25,4 +25,6 @@ pub struct File{
     pub user_id: Option<ObjectId>,
 
     pub folder_id: Option<ObjectId>,
+    
+    pub path: Option<String>
 }

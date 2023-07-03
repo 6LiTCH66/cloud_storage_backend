@@ -34,7 +34,7 @@ use axum::middleware::AddExtension;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use crate::controllers::dashboard_controllers::get_dashboard;
-use crate::controllers::folder_controllers::{create_folder, delete_folder, get_folders};
+use crate::controllers::folder_controllers::{create_folder, delete_folder, get_folder_details, get_folders};
 use crate::models::file_model::File;
 use crate::models::folder_model::Folder;
 use crate::services::folder_service::FolderCollection;
@@ -118,6 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let folder_router = Router::new()
         .route("/create", post(create_folder))
         .route("/folders", get(get_folders))
+        .route("/details", get(get_folder_details))
         .route("/delete", delete(delete_folder))
         .route_layer(axum_middleware::from_fn(verify_token))
 

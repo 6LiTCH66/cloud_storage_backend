@@ -20,6 +20,7 @@ impl From<FolderType> for Bson {
     }
 }
 
+// Folder struct to be save in DB
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Folder{
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
@@ -41,7 +42,9 @@ pub struct Folder{
 
     pub parent_id: Option<ObjectId>,
 
-    pub user_id: Option<ObjectId>
+    pub user_id: Option<ObjectId>,
+
+    pub path: Option<String>
 }
 
 
@@ -62,6 +65,8 @@ pub struct FolderJSON{
 
     pub parent_id: Option<ObjectId>,
 
+    pub path: Option<String>
+
 
 }
 
@@ -77,6 +82,7 @@ impl Folder {
             updated_at: None,
             parent_id: None,
             user_id: None,
+            path: None
         }
     }
 
